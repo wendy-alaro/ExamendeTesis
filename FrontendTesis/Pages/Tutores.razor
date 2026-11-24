@@ -1,0 +1,182 @@
+@page "/tutores"
+@inject HttpClient Http
+@inject ApiSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Tutores</PageTitle>
+
+<div class="page-heading mb-4">
+    <span class="eyebrow">DIRECTORIO ACADÉMICO</span>
+    <h1>Tutores</h1>
+    <p>Registra tutores y consulta cuántas tesis tiene asignadas. Cada tutor puede asesorar hasta tres.</p>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(mensaje))
+{
+    <div class="alert @(esError ? "alert-danger" : "alert-success")" role="alert">@mensaje</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <section class="card shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="h4 mb-3">Registrar tutor</h2>
+                <EditForm Model="nuevoTutor" OnValidSubmit="CrearTutorAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="mb-3">
+                        <label class="form-label" for="nombre">Nombre</label>
+                        <InputText id="nombre" class="form-control" @bind-Value="nuevoTutor.Nombre" />
+                        <ValidationMessage For="@(() => nuevoTutor.Nombre)" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="especialidad">Especialidad</label>
+                        <InputText id="especialidad" class="form-control" @bind-Value="nuevoTutor.Especialidad" />
+                        <ValidationMessage For="@(() => nuevoTutor.Especialidad)" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="correo">Correo</label>
+                        <InputText id="correo" type="email" class="form-control" @bind-Value="nuevoTutor.Correo" />
+                        <ValidationMessage For="@(() => nuevoTutor.Correo)" />
+                    </div>
+                    <button class="btn btn-primary" type="submit" disabled="@guardando">
+                        @(guardando ? "Guardando..." : "Registrar tutor")
+                    </button>
+                </EditForm>
+            </div>
+        </section>
+    </div>
+
+    <div class="col-lg-7">
+        <section class="card shadow-sm">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h4 mb-0">Tutores registrados</h2>
+                    <button class="btn btn-outline-primary btn-sm" type="button" @onclick="CargarTutoresAsync">Actualizar</button>
+                </div>
+                @if (tutores is null)
+                {
+                    <p>Cargando tutores...</p>
+                }
+                else if (tutores.Count == 0)
+                {
+                    <p class="text-secondary mb-0">Aún no se han registrado tutores.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead><tr><th>Nombre</th><th>Especialidad</th><th>Correo</th><th>Tesis</th></tr></thead>
+                            <tbody>
+                                @foreach (var tutor in tutores)
+                                {
+                                    <tr>
+                                        <td>@tutor.Nombre</td>
+                                        <td>@tutor.Especialidad</td>
+                                        <td>@tutor.Correo</td>
+                                        <td><span class="badge @(tutor.TesisAsignadas >= 3 ? "text-bg-secondary" : "text-bg-primary")">@tutor.TesisAsignadas / 3 tesis asignadas</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </section>
+    </div>
+</div>
+
+@code {
+    private TutorCrearDto nuevoTutor = new();
+    private List<TutorDto>? tutores;
+    private string? mensaje;
+    private bool esError;
+    private bool guardando;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        await CargarTutoresAsync();
+    }
+
+    private async Task CargarTutoresAsync()
+    {
+        mensaje = null;
+        try
+        {
+            using var response = await Http.GetAsync("api/tutores");
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Session.Logout();
+                Navigation.NavigateTo("/login");
+                return;
+            }
+
+            response.EnsureSuccessStatusCode();
+            tutores = await response.Content.ReadFromJsonAsync<List<TutorDto>>() ?? new();
+        }
+        catch (HttpRequestException exception)
+        {
+            mensaje = $"No se pudieron cargar los tutores: {exception.Message}";
+            esError = true;
+        }
+    }
+
+    private async Task CrearTutorAsync()
+    {
+        guardando = true;
+        mensaje = null;
+        try
+        {
+            using var response = await Http.PostAsJsonAsync("api/tutores", nuevoTutor);
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Session.Logout();
+                Navigation.NavigateTo("/login");
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                mensaje = await LeerErrorAsync(response);
+                esError = true;
+                return;
+            }
+
+            mensaje = "Tutor registrado correctamente.";
+            esError = false;
+            nuevoTutor = new TutorCrearDto();
+            await CargarTutoresAsync();
+        }
+        catch (HttpRequestException exception)
+        {
+            mensaje = $"No se pudo registrar el tutor: {exception.Message}";
+            esError = true;
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    private static async Task<string> LeerErrorAsync(HttpResponseMessage response)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+        try
+        {
+            using var json = System.Text.Json.JsonDocument.Parse(body);
+            if (json.RootElement.TryGetProperty("mensaje", out var mensajeApi))
+                return mensajeApi.GetString() ?? body;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+        }
+
+        return string.IsNullOrWhiteSpace(body) ? $"Error de API ({(int)response.StatusCode})." : body;
+    }
+}

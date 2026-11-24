@@ -1,0 +1,40 @@
+<article class="thesis-detail">
+    @if (!string.IsNullOrWhiteSpace(Tesis.Imagen))
+    {
+        <img class="thesis-detail-imagen" src="@ObtenerUrlImagen(Tesis.Imagen)" alt="Imagen de @Tesis.Titulo" />
+    }
+    else
+    {
+        <div class="thesis-detail-imagen tesis-imagen-sin-foto">Imagen no disponible</div>
+    }
+    <div class="thesis-detail-secciones">
+        <section>
+            <span class="eyebrow">TESIS</span>
+            <h3 class="h5 mt-1">@Tesis.Titulo</h3>
+            <p class="mb-0"><strong>Estudiante:</strong> @Tesis.Estudiante</p>
+        </section>
+        <section>
+            <span class="eyebrow">TUTOR</span>
+            <p class="mt-1 mb-1"><strong>@Tesis.Tutor?.Nombre</strong></p>
+            <p class="small mb-1">@Tesis.Tutor?.Especialidad</p>
+            <p class="small mb-1">@Tesis.Tutor?.Correo</p>
+            <p class="small text-secondary mb-0">@TesisAsignadasTutor / 3 tesis asignadas</p>
+        </section>
+        <section>
+            <span class="eyebrow">SEGUIMIENTO</span>
+            <p class="mt-1 mb-2"><span class="badge text-bg-light">@Tesis.Estado</span></p>
+            <p class="small text-secondary mb-0"><strong>ID:</strong> @Tesis.Id</p>
+        </section>
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired]
+    public TesisDto Tesis { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public Func<string, string> ObtenerUrlImagen { get; set; } = null!;
+
+    [Parameter]
+    public int TesisAsignadasTutor { get; set; }
+}

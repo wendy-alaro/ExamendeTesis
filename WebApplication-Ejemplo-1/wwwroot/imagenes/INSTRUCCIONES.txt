@@ -1,0 +1,6 @@
+IMÁGENES DE TESIS
+
+Copia en esta carpeta los archivos que quieras asociar a las tesis.
+Formatos permitidos: JPG, JPEG, PNG, WEBP y GIF.
+
+Al registrar una tesis, selecciona una imagen existente o sube una nueva desde el formulario. Los archivos permanecen en el servidor, dentro de esta carpeta; la base de datos guarda únicamente la ruta relativa, nunca los bytes de la imagen.

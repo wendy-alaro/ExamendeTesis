@@ -1,0 +1,129 @@
+html {
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #ec407a;
+}
+
+html {
+  position: relative;
+  min-height: 100%;
+}
+
+body {
+    margin-bottom: 60px;
+}
+
+:root {
+    --bs-primary: #c2185b;
+    --bs-primary-rgb: 194, 24, 91;
+}
+
+.bg-primary {
+    background-color: #ad1457 !important;
+}
+
+.text-primary {
+    color: #ad1457 !important;
+}
+
+.btn-primary {
+    background-color: #c2185b;
+    border-color: #ad1457;
+}
+
+.btn-primary:hover {
+    background-color: #ad1457;
+    border-color: #880e4f;
+}
+
+.btn-outline-primary {
+    color: #ad1457;
+    border-color: #c2185b;
+}
+
+.btn-outline-primary:hover {
+    color: #fff;
+    background-color: #c2185b;
+    border-color: #c2185b;
+}
+
+.bg-danger {
+    background-color: #ad1457 !important;
+}
+
+.text-danger {
+    color: #ad1457 !important;
+}
+
+.btn-danger {
+    background-color: #c2185b;
+    border-color: #ad1457;
+}
+
+.btn-danger:hover {
+    background-color: #ad1457;
+    border-color: #880e4f;
+}
+
+/*AGREGAMOS ESTILO PARA EL FOOTER FIJO  */
+
+body {
+    background-color: #fff8fb;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.welcome-panel {
+    background: linear-gradient(135deg, #fce4ec, #f8bbd0);
+    color: #4a1830;
+}
+
+.eyebrow {
+    color: #c2185b;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+}
+
+.card-minimal {
+    border: none;
+    border-radius: 1.25rem;
+    box-shadow: 0 10px 25px -5px rgba(194, 24, 91, 0.08);
+    background-color: #ffffff;
+}
+
+.input-minimal {
+    background-color: #fffafa;
+    border: 1px solid #f8bbd0;
+    border-radius: 0.75rem;
+    padding: 0.65rem 0.9rem;
+    transition: all 0.2s ease;
+}
+
+    .input-minimal:focus {
+        background-color: #ffffff;
+        border-color: #c2185b;
+        box-shadow: 0 0 0 3px rgba(194, 24, 91, 0.15);
+    }
+
+.img-miniatura {
+    width: 64px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 0.5rem;
+    border: 2px solid #f8bbd0;
+    transition: transform 0.2s ease;
+    cursor: pointer;
+}
+
+    .img-miniatura:hover {
+        transform: scale(1.08);
+        border-color: #c2185b;
+    }

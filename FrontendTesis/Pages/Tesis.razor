@@ -1,0 +1,457 @@
+@page "/tesis"
+@inject HttpClient Http
+@inject ApiSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Tesis</PageTitle>
+
+<div class="page-heading mb-4">
+    <span class="eyebrow">GESTIÓN ACADÉMICA</span>
+    <h1>Tesis</h1>
+    <p>Registra proyectos, asígnalos a un tutor y consulta sus datos por identificador.</p>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(mensaje))
+{
+    <div class="alert @(esError ? "alert-danger" : "alert-success")" role="alert">@mensaje</div>
+}
+
+<div class="row g-4 mb-5">
+    <div class="col-lg-5">
+        <section class="card shadow-sm h-100">
+            <div class="card-body p-4">
+                <h2 class="h4 mb-3">Registrar tesis</h2>
+                <div>
+                    <div class="mb-3">
+                        <label class="form-label" for="titulo">Título</label>
+                        <input id="titulo" class="form-control" @bind="nuevaTesis.Titulo" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="estudiante">Estudiante</label>
+                        <input id="estudiante" class="form-control" @bind="nuevaTesis.Estudiante" />
+                    </div>
+                    <p class="small text-secondary">Toda tesis nueva comienza en estado <strong>En desarrollo</strong> y avanza por sus etapas.</p>
+                    @if (tutores.Count == 0)
+                    {
+                        <div class="alert alert-warning">Primero registra un tutor para poder crear una tesis.</div>
+                        <a class="btn btn-outline-primary mb-3" href="/tutores">Registrar tutor</a>
+                    }
+                    else if (!tutores.Any(item => item.TesisAsignadas < 3))
+                    {
+                        <div class="alert alert-warning">Todos los tutores alcanzaron el límite de 3 tesis. Registra otro tutor para continuar.</div>
+                        <a class="btn btn-outline-primary mb-3" href="/tutores">Registrar tutor</a>
+                    }
+                    <div class="mb-3">
+                        <label class="form-label" for="tutor">Tutor (tesis asignadas / máximo 3)</label>
+                        <select id="tutor" class="form-select" @bind="nuevaTesis.IdTutor" disabled="@(!tutores.Any(item => item.TesisAsignadas < 3))">
+                            <option value="@Guid.Empty">Selecciona un tutor</option>
+                            @foreach (var tutor in tutores.Where(item => item.TesisAsignadas < 3))
+                            {
+                                <option value="@tutor.Id">@tutor.Nombre — @tutor.TesisAsignadas / 3 tesis asignadas</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="imagenTesis">Imagen de esta tesis (opcional)</label>
+                        <InputFile id="imagenTesis" OnChange="SeleccionarImagen" accept=".jpg,.jpeg,.png,.webp,.gif" />
+                        <div class="form-text">Elige un archivo de este equipo. Se guardará como la única imagen de esta tesis.</div>
+                        @if (imagenLocal is not null)
+                        {
+                            <div class="small text-secondary mt-1">Seleccionada: @imagenLocal.Name</div>
+                        }
+                    </div>
+                    <button class="btn btn-primary" type="button" @onclick="CrearTesisAsync">
+                        @(guardando ? "Guardando..." : "Registrar tesis")
+                    </button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div class="col-lg-7">
+        <section class="card shadow-sm h-100">
+            <div class="card-body p-4">
+                <h2 class="h4 mb-3">Buscar tesis por ID</h2>
+                <div class="input-group mb-3">
+                    <input class="form-control" @bind="idBusqueda" placeholder="Pega el identificador de la tesis" aria-label="ID de tesis" />
+                    <button class="btn btn-outline-primary" type="button" @onclick="BuscarTesisAsync" disabled="@buscando">@(buscando ? "Buscando..." : "Buscar")</button>
+                </div>
+                @if (tesisEncontrada is not null)
+                {
+                    <TesisDetalle Tesis="tesisEncontrada" TesisAsignadasTutor="CantidadAsignada(tesisEncontrada.IdTutor)" ObtenerUrlImagen="ObtenerUrlImagen" />
+                }
+                else
+                {
+                    <p class="text-secondary mb-0">El resultado incluye los datos del tutor asignado.</p>
+                }
+            </div>
+        </section>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h3 mb-0">Tesis registradas</h2>
+    <button class="btn btn-outline-primary btn-sm" type="button" @onclick="CargarDatosAsync">Actualizar</button>
+</div>
+@if (tesis is null)
+{
+    <p>Cargando tesis...</p>
+}
+else if (tesis.Count == 0)
+{
+    <div class="empty-state">Aún no se han registrado tesis.</div>
+}
+else
+{
+    <div class="d-grid gap-3">
+        @foreach (var item in tesis)
+        {
+            <article class="card tesis-card-horizontal shadow-sm">
+                @if (!string.IsNullOrWhiteSpace(item.Imagen))
+                {
+                    <img class="tesis-card-imagen" src="@ObtenerUrlImagen(item.Imagen)" alt="Imagen de @item.Titulo" />
+                }
+                else
+                {
+                    <div class="tesis-card-imagen tesis-imagen-sin-foto">Imagen no disponible</div>
+                }
+                <div class="tesis-card-contenido">
+                    <div class="tesis-card-seccion">
+                        <span class="eyebrow">TESIS</span>
+                        <h3 class="h5 mt-1">@item.Titulo</h3>
+                        <p class="mb-0"><strong>Estudiante:</strong> @item.Estudiante</p>
+                    </div>
+                    <div class="tesis-card-seccion">
+                        <span class="eyebrow">TUTOR</span>
+                        <p class="mb-1 mt-1"><strong>@item.Tutor?.Nombre</strong></p>
+                        <p class="small text-secondary mb-0">@CantidadAsignada(item.IdTutor) / 3 tesis asignadas</p>
+                    </div>
+                    <div class="tesis-card-seccion">
+                        <span class="eyebrow">ESTADO</span>
+                        <p class="mt-1 mb-2"><span class="badge text-bg-light">@item.Estado</span></p>
+                        @if (item.Estado == "Finalizada")
+                        {
+                            <p class="small text-success mb-0">Tesis finalizada; no admite más cambios de estado.</p>
+                        }
+                        else
+                        {
+                            <button class="btn btn-sm btn-outline-primary" type="button" disabled="@actualizandoEstado.Contains(item.Id)" @onclick="() => AvanzarEstadoAsync(item)">
+                                @(actualizandoEstado.Contains(item.Id) ? "Actualizando..." : SiguienteEstado(item.Estado))
+                            </button>
+                        }
+                    </div>
+                    <div class="tesis-card-acciones">
+                        <span class="small text-secondary">ID: @item.Id</span>
+                        <button class="btn btn-sm btn-outline-primary" type="button" @onclick="() => MostrarTesis(item)">Ver detalle</button>
+                    </div>
+                </div>
+            </article>
+        }
+    </div>
+}
+
+@code {
+    private TesisCrearDto nuevaTesis = new();
+    private List<TesisDto>? tesis;
+    private List<TutorDto> tutores = new();
+    private IBrowserFile? imagenLocal;
+    private readonly HashSet<Guid> actualizandoEstado = new();
+    private TesisDto? tesisEncontrada;
+    private string idBusqueda = string.Empty;
+    private string? mensaje;
+    private bool esError;
+    private bool guardando;
+    private bool buscando;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        await CargarDatosAsync();
+    }
+
+    private async Task CargarDatosAsync()
+    {
+        mensaje = null;
+        try
+        {
+            var response = await Http.GetAsync("api/tesis");
+            if (await ManejarNoAutorizadoAsync(response)) return;
+            response.EnsureSuccessStatusCode();
+            tesis = await response.Content.ReadFromJsonAsync<List<TesisDto>>() ?? new();
+
+            tutores = await Http.GetFromJsonAsync<List<TutorDto>>("api/tutores") ?? new();
+            if (nuevaTesis.IdTutor == Guid.Empty)
+            {
+                nuevaTesis.IdTutor = tutores.FirstOrDefault(item => item.TesisAsignadas < 3)?.Id ?? Guid.Empty;
+            }
+        }
+        catch (HttpRequestException exception)
+        {
+            mensaje = $"No se pudieron cargar los datos: {exception.Message}";
+            esError = true;
+        }
+    }
+
+    private async Task CrearTesisAsync()
+    {
+        if (guardando)
+        {
+            return;
+        }
+
+        if (!Session.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        var erroresValidacion = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
+        var formularioValido = System.ComponentModel.DataAnnotations.Validator.TryValidateObject(
+            nuevaTesis,
+            new System.ComponentModel.DataAnnotations.ValidationContext(nuevaTesis),
+            erroresValidacion,
+            validateAllProperties: true);
+        if (!formularioValido)
+        {
+            mensaje = string.Join(" ", erroresValidacion.Select(error => error.ErrorMessage));
+            esError = true;
+            return;
+        }
+
+        mensaje = null;
+        if (nuevaTesis.IdTutor == Guid.Empty)
+        {
+            mensaje = "Selecciona un tutor para la tesis.";
+            esError = true;
+            return;
+        }
+
+        var titulo = nuevaTesis.Titulo.Trim();
+        if (tesis?.Any(item => string.Equals(item.Titulo.Trim(), titulo, StringComparison.OrdinalIgnoreCase)) == true)
+        {
+            mensaje = "Ya existe una tesis con ese título. Los títulos no pueden repetirse aunque cambien mayúsculas o minúsculas.";
+            esError = true;
+            return;
+        }
+
+        var tutorSeleccionado = tutores.SingleOrDefault(item => item.Id == nuevaTesis.IdTutor);
+        if (tutorSeleccionado is null || tutorSeleccionado.TesisAsignadas >= 3)
+        {
+            mensaje = "El tutor seleccionado ya no tiene cupo disponible. Actualiza la lista y elige otro tutor.";
+            esError = true;
+            return;
+        }
+
+        guardando = true;
+        mensaje = null;
+        try
+        {
+            if (imagenLocal is not null)
+            {
+                var rutaImagen = await SubirImagenAlServidorAsync(imagenLocal);
+                if (rutaImagen is null) return;
+                nuevaTesis.Imagen = rutaImagen;
+            }
+
+            using var response = await Http.PostAsJsonAsync("api/tesis", nuevaTesis);
+            if (await ManejarNoAutorizadoAsync(response)) return;
+            if (!response.IsSuccessStatusCode)
+            {
+                mensaje = await LeerErrorAsync(response);
+                esError = true;
+                return;
+            }
+
+            var creada = await response.Content.ReadFromJsonAsync<TesisDto>();
+            mensaje = creada is null ? "Tesis registrada." : $"Tesis registrada. ID: {creada.Id}";
+            esError = false;
+            nuevaTesis = new TesisCrearDto();
+            imagenLocal = null;
+            await CargarDatosAsync();
+        }
+        catch (Exception exception) when (exception is HttpRequestException or IOException)
+        {
+            mensaje = $"No se pudo registrar la tesis: {exception.Message}";
+            esError = true;
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    private async Task BuscarTesisAsync()
+    {
+        if (!Guid.TryParse(idBusqueda, out var id))
+        {
+            mensaje = "Ingresa un ID válido (GUID).";
+            esError = true;
+            tesisEncontrada = null;
+            return;
+        }
+
+        buscando = true;
+        mensaje = null;
+        try
+        {
+            using var response = await Http.GetAsync($"api/tesis/{id}");
+            if (await ManejarNoAutorizadoAsync(response)) return;
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                tesisEncontrada = null;
+                mensaje = "No se encontró una tesis con ese ID.";
+                esError = true;
+                return;
+            }
+
+            response.EnsureSuccessStatusCode();
+            tesisEncontrada = await response.Content.ReadFromJsonAsync<TesisDto>();
+        }
+        catch (HttpRequestException exception)
+        {
+            mensaje = $"No se pudo buscar la tesis: {exception.Message}";
+            esError = true;
+        }
+        finally
+        {
+            buscando = false;
+        }
+    }
+
+    private void SeleccionarImagen(InputFileChangeEventArgs args)
+    {
+        var archivo = args.File;
+        var extension = Path.GetExtension(archivo.Name);
+        if (!new[] { ".jpg", ".jpeg", ".png", ".webp", ".gif" }
+                .Contains(extension, StringComparer.OrdinalIgnoreCase))
+        {
+            imagenLocal = null;
+            mensaje = "Formato no permitido. Elige JPG, PNG, WEBP o GIF.";
+            esError = true;
+            return;
+        }
+
+        if (archivo.Size == 0 || archivo.Size > 10 * 1024 * 1024)
+        {
+            imagenLocal = null;
+            mensaje = "La imagen debe tener un tamaño máximo de 10 MB.";
+            esError = true;
+            return;
+        }
+
+        imagenLocal = archivo;
+        mensaje = null;
+        esError = false;
+    }
+
+    private async Task<string?> SubirImagenAlServidorAsync(IBrowserFile archivo)
+    {
+        using var contenido = new MultipartFormDataContent();
+        await using var stream = archivo.OpenReadStream(10 * 1024 * 1024);
+        using var archivoContenido = new StreamContent(stream);
+        contenido.Add(archivoContenido, "archivo", archivo.Name);
+        using var response = await Http.PostAsync("api/tesis/subir-imagen", contenido);
+        if (await ManejarNoAutorizadoAsync(response)) return null;
+        if (!response.IsSuccessStatusCode)
+        {
+            mensaje = await LeerErrorAsync(response);
+            esError = true;
+            return null;
+        }
+
+        using var resultado = await System.Text.Json.JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        var ruta = resultado.RootElement.GetProperty("url").GetString();
+        if (string.IsNullOrWhiteSpace(ruta))
+        {
+            mensaje = "La API no devolvió la ruta de la imagen subida.";
+            esError = true;
+            return null;
+        }
+
+        return ruta;
+    }
+
+    private async Task AvanzarEstadoAsync(TesisDto item)
+    {
+        actualizandoEstado.Add(item.Id);
+        try
+        {
+            using var response = await Http.PatchAsJsonAsync(
+                $"api/tesis/{item.Id}/estado",
+                new EstadoTesisDto { Estado = SiguienteEstado(item.Estado) });
+            if (await ManejarNoAutorizadoAsync(response)) return;
+            if (!response.IsSuccessStatusCode)
+            {
+                mensaje = await LeerErrorAsync(response);
+                esError = true;
+                return;
+            }
+
+            mensaje = $"Estado actualizado a {SiguienteEstado(item.Estado)}.";
+            esError = false;
+            await CargarDatosAsync();
+        }
+        catch (HttpRequestException exception)
+        {
+            mensaje = $"No se pudo actualizar el estado: {exception.Message}";
+            esError = true;
+        }
+        finally
+        {
+            actualizandoEstado.Remove(item.Id);
+        }
+    }
+
+    private static string SiguienteEstado(string estado) => estado switch
+    {
+        "En desarrollo" => "En revisión",
+        "En revisión" => "Finalizada",
+        _ => "Finalizada"
+    };
+
+    private int CantidadAsignada(Guid idTutor) =>
+        tutores.SingleOrDefault(tutor => tutor.Id == idTutor)?.TesisAsignadas ?? 0;
+
+    private Task<bool> ManejarNoAutorizadoAsync(HttpResponseMessage response)
+    {
+        if (response.StatusCode != System.Net.HttpStatusCode.Unauthorized)
+            return Task.FromResult(false);
+
+        Session.Logout();
+        Navigation.NavigateTo("/login");
+        return Task.FromResult(true);
+    }
+
+    private static async Task<string> LeerErrorAsync(HttpResponseMessage response)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+        try
+        {
+            using var json = System.Text.Json.JsonDocument.Parse(body);
+            if (json.RootElement.TryGetProperty("mensaje", out var mensajeApi))
+                return mensajeApi.GetString() ?? body;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+        }
+
+        return string.IsNullOrWhiteSpace(body) ? $"Error de API ({(int)response.StatusCode})." : body;
+    }
+
+    private void MostrarTesis(TesisDto item)
+    {
+        tesisEncontrada = item;
+        idBusqueda = item.Id.ToString();
+    }
+
+    private string ObtenerUrlImagen(string ruta)
+    {
+        return new Uri(Http.BaseAddress!, ruta.TrimStart('/')).ToString();
+    }
+
+}
